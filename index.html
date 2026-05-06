@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCI Shadow Trade — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-adapter-date-fns/3.0.0/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/3.0.1/chartjs-plugin-annotation.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #ffffff; color: #1a1a1a; }
+
+  .header { padding: 28px 40px 0; }
+  .header h1 { font-size: 24px; font-weight: 600; color: #111; }
+  .header .subtitle { font-size: 13px; color: #999; margin-top: 4px; }
+
+  /* Top tabs */
+  .top-tabs { display: flex; gap: 0; padding: 16px 40px 0; border-bottom: 1px solid #e5e7eb; }
+  .top-tab { background: none; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+  .top-tab:hover { color: #111; }
+  .top-tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Big return number */
+  .hero-return { padding: 8px 40px 0; }
+  .hero-return .big-num { font-size: 42px; font-weight: 700; letter-spacing: -1px; }
+  .hero-return .change-line { font-size: 15px; margin-top: 2px; display: flex; align-items: center; gap: 8px; }
+  .hero-return .change-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 6px; font-weight: 500; font-size: 14px; }
+  .pill-green { background: rgba(22,163,74,0.1); color: #16a34a; }
+  .pill-red { background: rgba(220,38,38,0.1); color: #dc2626; }
+  .hero-return .date-label { color: #999; font-size: 13px; }
+
+  /* Stats row */
+  .stats { display: flex; gap: 20px; padding: 20px 40px 8px; flex-wrap: wrap; }
+  .stat-card { background: #f8f9fa; border-radius: 10px; padding: 14px 18px; min-width: 145px; border: 1px solid #e5e7eb; }
+  .stat-card .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 3px; }
+  .stat-card .value { font-size: 20px; font-weight: 600; }
+  .stat-card .sub { font-size: 11px; color: #999; margin-top: 2px; }
+  .green { color: #16a34a; }
+  .red { color: #dc2626; }
+  .blue { color: #2563eb; }
+
+  /* Yearly performance cards */
+  .yearly-section { padding: 20px 40px; }
+  .yearly-section h3 { font-size: 13px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
+  .yearly-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+  .year-card { flex: 1; min-width: 220px; background: #f8f9fa; border-radius: 10px; padding: 16px 18px; border: 1px solid #e5e7eb; }
+  .year-card .year-title { font-size: 18px; font-weight: 700; color: #111; margin-bottom: 10px; }
+  .year-card .yr-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 13px; }
+  .year-card .yr-label { color: #111; }
+  .year-card .yr-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .year-card .yr-divider { border-top: 1px solid #e5e7eb; margin: 6px 0; }
+  .yr-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 3px; background: #f0fdf4; color: #16a34a; margin-left: 4px; vertical-align: 1px; }
+  .yr-link { color: inherit; text-decoration: none; border-bottom: 1px dashed #ccc; cursor: pointer; }
+  .yr-link:hover { border-bottom-color: #2563eb; color: #2563eb; }
+
+  /* Range selector */
+  .controls-bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 40px 0; flex-wrap: wrap; gap: 10px; }
+  .range-btns { display: flex; gap: 0; background: #fff; border-radius: 8px; border: 1px solid #d1d5db; overflow: hidden; }
+  .range-btn { background: transparent; border: none; color: #6b7280; padding: 8px 16px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.12s; border-right: 1px solid #e5e7eb; }
+  .range-btn:last-child { border-right: none; }
+  .range-btn:hover { color: #111; background: #f3f4f6; }
+  .range-btn.active { color: #fff; background: #2563eb; }
+
+  .view-toggle { display: flex; gap: 0; background: #fff; border-radius: 8px; border: 1px solid #d1d5db; overflow: hidden; }
+  .view-btn { background: transparent; border: none; color: #6b7280; padding: 8px 14px; font-size: 12px; cursor: pointer; transition: all 0.12s; border-right: 1px solid #e5e7eb; }
+  .view-btn:last-child { border-right: none; }
+  .view-btn:hover { color: #111; background: #f3f4f6; }
+  .view-btn.active { color: #fff; background: #374151; }
+
+  .legend-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #6b7280; cursor: pointer; user-select: none; }
+  .legend-item .swatch { width: 24px; height: 0; border-top: 2.5px solid var(--c); border-radius: 0; }
+  .legend-item .swatch.dashed { border-top-style: dashed; background: none; }
+  .legend-item.muted { opacity: 0.3; }
+
+  /* Chart */
+  .chart-container { padding: 12px 40px 8px; }
+  .chart-wrap { background: #fff; border-radius: 12px; padding: 20px 20px 14px; border: 1px solid #e5e7eb; }
+  .chart-wrap canvas { width: 100% !important; }
+
+  /* Events table */
+  .events-panel { padding: 20px 40px 40px; }
+  .events-panel h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #111; }
+  .events-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #e5e7eb; }
+  .events-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; text-align: left; padding: 10px 14px; border-bottom: 1px solid #e5e7eb; background: #f9fafb; }
+  .events-table td { font-size: 13px; padding: 8px 14px; border-bottom: 1px solid #f0f0f0; }
+  .events-table tr:last-child td { border-bottom: none; }
+  .events-table tr:hover td { background: #f8f9fb; cursor: pointer; }
+  .events-table tr.highlight td { background: #eff6ff; transition: background 0.3s; }
+  .events-table a.source-link { color: #2563eb; text-decoration: none; font-size: 12px; white-space: nowrap; }
+  .events-table a.source-link:hover { text-decoration: underline; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-13f { background: #eff6ff; color: #2563eb; }
+  .badge-13d { background: #fef2f2; color: #dc2626; }
+  .badge-eu { background: #f0fdf4; color: #16a34a; }
+  .badge-activist { background: #faf5ff; color: #9333ea; }
+  .badge-proposal { background: #fefce8; color: #a16207; }
+  .badge-other { background: #f3f4f6; color: #6b7280; }
+
+  /* Holdings tab */
+  .holdings-section { padding: 20px 40px 40px; }
+  .holdings-controls { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .holdings-controls label { font-size: 13px; color: #888; font-weight: 500; }
+  .holdings-controls select { padding: 7px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; background: #fff; color: #111; cursor: pointer; }
+  .holdings-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #e5e7eb; }
+  .holdings-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; text-align: left; padding: 10px 14px; border-bottom: 1px solid #e5e7eb; background: #f9fafb; }
+  .holdings-table th.right, .holdings-table td.right { text-align: right; }
+  .holdings-table td { font-size: 13px; padding: 10px 14px; border-bottom: 1px solid #f0f0f0; }
+  .holdings-table tr:last-child td { border-bottom: none; }
+  .holdings-table tr:hover td { background: #f8f9fb; }
+  .holdings-table .total-row td { font-weight: 700; border-top: 2px solid #e5e7eb; background: #f9fafb; }
+  .pct-bar { display: inline-block; height: 8px; border-radius: 4px; background: #3b82f6; vertical-align: middle; margin-right: 6px; min-width: 2px; }
+  .region-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; margin-left: 6px; }
+  .region-us { background: #eff6ff; color: #2563eb; }
+  .region-eu { background: #f0fdf4; color: #16a34a; }
+  .chart-holdings-wrap { margin-top: 20px; background: #fff; border-radius: 12px; padding: 20px; border: 1px solid #e5e7eb; }
+
+  /* Holdings event cards & change indicators */
+  .holdings-events-summary { margin-bottom: 16px; }
+  .holdings-events-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .holdings-event-card { display: flex; gap: 10px; align-items: center; padding: 8px 14px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 13px; cursor: pointer; transition: background 0.12s; }
+  .holdings-event-card:hover { background: #f0f4ff; border-color: #c7d2fe; }
+  .holdings-event-card .badge { flex-shrink: 0; }
+  .holdings-event-card .ev-company { font-weight: 600; white-space: nowrap; }
+  .holdings-event-card .ev-detail { color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .holdings-event-card .ev-date { color: #aaa; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .holdings-change-summary { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .change-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+  .change-chip-new { background: #f0fdf4; color: #16a34a; }
+  .change-chip-exit { background: #fef2f2; color: #dc2626; }
+  .change-chip-up { background: #eff6ff; color: #2563eb; }
+  .change-chip-down { background: #fefce8; color: #a16207; }
+  .change-chip-init { background: #f3f4f6; color: #6b7280; }
+  .holdings-table tr.row-new td { background: rgba(22,163,74,0.06); }
+  .holdings-table tr.row-new td:first-child { border-left: 3px solid #16a34a; }
+  .holdings-table tr.row-exited td { background: rgba(220,38,38,0.04); }
+  .holdings-table tr.row-exited td:first-child { border-left: 3px solid #dc2626; }
+  .holdings-table tr.row-increased td:first-child { border-left: 3px solid #3b82f6; }
+  .holdings-table tr.row-decreased td:first-child { border-left: 3px solid #f59e0b; }
+  .chg-label { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; margin-right: 4px; }
+  .chg-label-new { background: #f0fdf4; color: #16a34a; }
+  .chg-label-exit { background: #fef2f2; color: #dc2626; }
+  .holdings-controls select { min-width: 360px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>TCI Shadow Trade</h1>
+  <div class="subtitle">Monthly portfolio return tracker · Data through: Apr 30, 2026 · Vertical lines = portfolio change disclosures</div>
+</div>
+
+<div class="top-tabs">
+  <button class="top-tab active" data-tab="returns">Returns</button>
+  <button class="top-tab" data-tab="annual">Annual Comparison</button>
+  <button class="top-tab" data-tab="holdings">TCI Shadow Holdings</button>
+</div>
+
+<!-- TAB 1: RETURNS -->
+<div class="tab-panel active" id="tab-returns">
+  <div class="hero-return" id="heroReturn"></div>
+  <div class="stats" id="stats"></div>
+
+  <div class="controls-bar">
+    <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+      <div class="range-btns" id="rangeBtns">
+        <button class="range-btn" data-range="3m">3M</button>
+        <button class="range-btn" data-range="6m">6M</button>
+        <button class="range-btn" data-range="ytd">YTD</button>
+        <button class="range-btn" data-range="1y">1Y</button>
+        <button class="range-btn" data-range="2y">2Y</button>
+        <button class="range-btn active" data-range="max">MAX</button>
+      </div>
+      <div class="view-toggle">
+        <button class="view-btn active" data-view="cumulative">Growth of $1</button>
+        <button class="view-btn" data-view="daily">Monthly %</button>
+      </div>
+    </div>
+    <div class="legend-row" id="legend"></div>
+  </div>
+
+  <div class="chart-container">
+    <div class="chart-wrap">
+      <canvas id="mainChart" height="420" style="height:420px;"></canvas>
+    </div>
+  </div>
+
+  <div class="events-panel">
+    <h3>Portfolio Change Events</h3>
+    <table class="events-table" id="eventsTable">
+      <thead><tr><th>Date</th><th>Type</th><th>Company</th><th>Details</th><th>Source</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- TAB 2: ANNUAL COMPARISON -->
+<div class="tab-panel" id="tab-annual">
+  <div class="yearly-section">
+    <h3>Calendar Year Returns</h3>
+    <div class="yearly-grid" id="yearlyGrid"></div>
+  </div>
+</div>
+
+<!-- TAB 3: HOLDINGS -->
+<div class="tab-panel" id="tab-holdings">
+  <div class="holdings-section">
+    <div class="holdings-controls">
+      <label>Disclosure Event:</label>
+      <select id="holdingsPeriodSelect"></select>
+    </div>
+    <div id="holdingsEventsSummary" class="holdings-events-summary"></div>
+    <table class="holdings-table" id="holdingsTable">
+      <thead><tr><th>Company</th><th>Region</th><th class="right">Value ($M)</th><th class="right">Weight</th><th style="min-width:120px">Allocation</th><th class="right">Chg vs Prior</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="chart-holdings-wrap">
+      <canvas id="holdingsChart" height="300" style="height:300px;"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== DATA =====
+const DAILY = [{"date":"2021-12-31","known":1.0,"sp500":1.0},{"date":"2022-01-31","known":0.953515,"sp500":0.948253},{"date":"2022-02-28","known":0.946649,"sp500":0.91986},{"date":"2022-03-31","known":0.978474,"sp500":0.954015},{"date":"2022-04-29","known":0.863476,"sp500":0.870823},{"date":"2022-05-31","known":0.861899,"sp500":0.87242},{"date":"2022-06-30","known":0.807632,"sp500":0.800408},{"date":"2022-07-29","known":0.882844,"sp500":0.874209},{"date":"2022-08-31","known":0.824706,"sp500":0.838557},{"date":"2022-09-30","known":0.731002,"sp500":0.761327},{"date":"2022-10-31","known":0.793276,"sp500":0.822965},{"date":"2022-11-30","known":0.854523,"sp500":0.868956},{"date":"2022-12-30","known":0.805737,"sp500":0.818891},{"date":"2023-01-31","known":0.874463,"sp500":0.870346},{"date":"2023-02-28","known":0.847172,"sp500":0.849109},{"date":"2023-03-31","known":0.901616,"sp500":0.880284},{"date":"2023-04-28","known":0.93689,"sp500":0.894024},{"date":"2023-05-31","known":0.951875,"sp500":0.89791},{"date":"2023-06-30","known":1.008966,"sp500":0.95724},{"date":"2023-07-31","known":1.022377,"sp500":0.987991},{"date":"2023-08-31","known":1.003771,"sp500":0.972261},{"date":"2023-09-29","known":0.954476,"sp500":0.925905},{"date":"2023-10-31","known":0.934965,"sp500":0.906437},{"date":"2023-11-30","known":1.047876,"sp500":0.989218},{"date":"2023-12-29","known":1.103825,"sp500":1.034158},{"date":"2024-01-31","known":1.130948,"sp500":1.051537},{"date":"2024-02-29","known":1.181847,"sp500":1.107684},{"date":"2024-03-28","known":1.239095,"sp500":1.143324},{"date":"2024-04-30","known":1.218418,"sp500":1.096625},{"date":"2024-05-31","known":1.262089,"sp500":1.151001},{"date":"2024-06-28","known":1.240044,"sp500":1.192301},{"date":"2024-07-31","known":1.283235,"sp500":1.206814},{"date":"2024-08-30","known":1.312372,"sp500":1.236087},{"date":"2024-09-30","known":1.347787,"sp500":1.262486},{"date":"2024-10-31","known":1.289875,"sp500":1.251038},{"date":"2024-11-29","known":1.348209,"sp500":1.324475},{"date":"2024-12-31","known":1.30094,"sp500":1.292902},{"date":"2025-01-31","known":1.420186,"sp500":1.328905},{"date":"2025-02-28","known":1.425272,"sp500":1.311566},{"date":"2025-03-31","known":1.363878,"sp500":1.237667},{"date":"2025-04-30","known":1.36703,"sp500":1.229274},{"date":"2025-05-30","known":1.51884,"sp500":1.306651},{"date":"2025-06-30","known":1.576164,"sp500":1.373097},{"date":"2025-07-31","known":1.607556,"sp500":1.403913},{"date":"2025-08-29","known":1.616405,"sp500":1.432373},{"date":"2025-09-30","known":1.645226,"sp500":1.484655},{"date":"2025-10-31","known":1.673043,"sp500":1.519416},{"date":"2025-11-28","known":1.644956,"sp500":1.52314},{"date":"2025-12-31","known":1.675745,"sp500":1.524072},{"date":"2026-01-30","known":1.654751,"sp500":1.546171},{"date":"2026-02-27","known":1.7176,"sp500":1.534421},{"date":"2026-03-31","known":1.514342,"sp500":1.458014},{"date":"2026-04-30","known":1.602927,"sp500":1.610999}];
+
+const PORTFOLIO_CHANGES = [
+  {"date":"2022-01-25","type":"SC 13D/A","company":"Canadian National Railway","ticker":"CNI","stake":"~5.2%","details":"Amendment to Schedule 13D — updated beneficial ownership following proxy settlement and board changes","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000090266422000582/"},
+  {"date":"2022-02-14","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q4 2021 quarterly holdings report — 9 positions totalling ~$35B","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725122000002/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2022-03-01","type":"Shareholder Proposal","company":"AENA / Safran / Airbus","ticker":"AENA.MC / SAF.PA / AIR.PA","stake":"","details":"Say on Climate shareholder resolutions filed for 2022 AGMs across three European portfolio companies","source":"TCI ESG Engagements","url":"https://www.tcifund.com/ESGEngagements"},
+  {"date":"2022-03-22","type":"Proxy Fight","company":"Canadian National Railway","ticker":"CNR.TO","stake":"~5.2%","details":"Special meeting of shareholders — TCI's board nominees voted on following 2021 proxy contest","source":"SEC EDGAR / CN Press","url":"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001647251&type=SC+13D&dateb=&owner=include&count=40"},
+  {"date":"2022-04-01","type":"Shareholder Proposal","company":"Alphabet / Moody\u2019s / S&P Global","ticker":"GOOG / MCO / SPGI","stake":"","details":"Say on Climate resolutions filed for 2022 AGMs — Moody's and S&P Global both adopted advisory votes","source":"TCI ESG Engagements","url":"https://www.tcifund.com/ESGEngagements"},
+  {"date":"2022-05-16","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q1 2022 quarterly holdings report","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725122000004/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2022-08-15","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q2 2022 quarterly holdings report","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725122000006/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2022-11-14","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q3 2022 quarterly holdings report","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725122000008/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2022-11-15","type":"Activist Letter","company":"Alphabet","ticker":"GOOG","stake":">$6B stake","details":"Open letter to CEO Sundar Pichai demanding headcount cuts, cost reduction, Waymo review, 40%+ Google Services margin target","source":"TCI Corporate Engagements","url":"https://www.tcifund.com/CorporateEngagements/Alphabet"},
+  {"date":"2023-01-20","type":"Activist Letter","company":"Alphabet","ticker":"GOOG","stake":">$6B stake","details":"Follow-up letter to Alphabet reiterating cost-cutting demands ahead of Q4 2022 earnings","source":"TCI Corporate Engagements","url":"https://www.tcifund.com/CorporateEngagements/Alphabet"},
+  {"date":"2023-02-14","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q4 2022 quarterly holdings report","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725123000005/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2023-02-20","type":"Activist Letter","company":"Airbus","ticker":"AIR.PA","stake":"~3% (~\u20ac4B)","details":"Open letter urging Airbus to terminate Atos/Evidian acquisition; filed AGM agenda motion for Apr 19, 2023","source":"TCI Corporate Engagements","url":"https://www.tcifund.com/CorporateEngagements/Airbus"},
+  {"date":"2023-03-23","type":"Activist Letter","company":"Cellnex Telecom","ticker":"CLNX.MC","stake":"~9.4%","details":"Open letter to Cellnex board on capital allocation and governance; TCI became largest shareholder","source":"TCI Letter to Cellnex","url":"https://www.tcifund.com"},
+  {"date":"2023-03-23","type":"Substantial Holding","company":"Cellnex Telecom","ticker":"CLNX.MC","stake":"9.39%","details":"CNMV notification — TCI Luxembourg + CIFF Capital UK aggregate holding exceeds 5% threshold","source":"CNMV Register","url":"https://www.cnmv.es/portal/Consultas/Busqueda.aspx?lang=en"},
+  {"date":"2023-05-15","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q1 2023 quarterly holdings report","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725123000007/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2023-05-17","type":"Substantial Holding","company":"Ferrovial SE","ticker":"FER.AS","stake":">3%","details":"AFM notification — TCI crossed 3% threshold following Ferrovial's relisting from Madrid to Amsterdam Euronext","source":"AFM Register","url":"https://www.afm.nl/en/sector/registers/meldingenregisters/substantiele-deelnemingen"},
+  {"date":"2023-06-01","type":"Board Appointment","company":"Cellnex Telecom","ticker":"CLNX.MC","stake":"~9.4%","details":"Jonathan Amouyal (TCI) appointed as proprietary director to Cellnex board","source":"Cellnex Governance Report","url":"https://www.cellnex.com/investors/corporate-governance/"},
+  {"date":"2023-06-01","type":"Derivative Notification","company":"AENA SME","ticker":"AENA.MC","stake":"~6% (3.4% derivatives + 2.6% direct)","details":"CNMV notification of equity swap novation — renewed derivative contracts expiring through 2025","source":"CNMV Filings","url":"https://www.cnmv.es/portal/Consultas/Busqueda.aspx?lang=en"},
+  {"date":"2023-08-14","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q2 2023 quarterly holdings report","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725123000010/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2023-11-14","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q3 2023 quarterly holdings report","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725123000012/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2024-02-14","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q4 2023 quarterly holdings report — portfolio ~$42B, 9 positions","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725124000002/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2024-03-01","type":"Shareholder Proposal","company":"AENA / Safran / Airbus","ticker":"AENA.MC / SAF.PA / AIR.PA","stake":"","details":"Say on Climate shareholder resolutions for 2024 AGMs","source":"TCI ESG Engagements","url":"https://www.tcifund.com/ESGEngagements"},
+  {"date":"2024-05-15","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q1 2024 quarterly holdings report","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725124000004/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2024-06-01","type":"Activist Letter","company":"AENA SME","ticker":"AENA.MC","stake":"~6%","details":"TCI threatens legal action against AENA board over airport tariff regulation","source":"CNMV / Investing.com","url":"https://www.cnmv.es/portal/Consultas/Busqueda.aspx?lang=en"},
+  {"date":"2024-08-14","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q2 2024 quarterly holdings report","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725124000007/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2024-11-01","type":"SC 13D/A","company":"Canadian National Railway","ticker":"CNI","stake":"~4.2%","details":"Amendment to 13D — sold ~2.72M shares between Sep 8 and Nov 1, 2024; reduced stake","source":"SEC EDGAR / Fintel","url":"https://www.sec.gov/Archives/edgar/data/1647251/000090266424006201/"},
+  {"date":"2024-11-14","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q3 2024 quarterly holdings report — portfolio $52.7B","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725124000011/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2025-02-14","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q4 2024 quarterly holdings report — portfolio $42.4B after market volatility","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725125000003/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2025-03-01","type":"Shareholder Proposal","company":"Portfolio Companies","ticker":"Multiple","stake":"","details":"Say on Climate shareholder resolutions filed across portfolio for 2025 AGM season","source":"TCI ESG Engagements","url":"https://www.tcifund.com/ESGEngagements"},
+  {"date":"2025-04-30","type":"SC 13D/A","company":"Canadian National Railway","ticker":"CNI","stake":"4.2% (26.17M shares)","details":"Amendment to 13D — 26.17M shares, further reduced from ~5.2% to ~4.2%","source":"SEC EDGAR / Fintel","url":"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001647251&type=SC+13D&dateb=&owner=include&count=40"},
+  {"date":"2025-05-15","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q1 2025 quarterly holdings report","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725125000005/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2025-06-01","type":"TCFD Report","company":"TCI Fund Management","ticker":"","stake":"","details":"Annual TCFD Entity Report published — climate risk disclosures for fund operations","source":"TCI Regulatory Disclosures","url":"https://www.tcifund.com/regulatorydisclosures"},
+  {"date":"2025-08-14","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q2 2025 quarterly holdings report — portfolio $50.7B; massive Visa add (+47%, ~9M shares)","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725125000009/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2025-11-14","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q3 2025 quarterly holdings report — portfolio $52.7B; GOOG reduced 41%, CNI reduced 18%","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725125000014/xslForm13F_X02/Form13fInfoTable.xml"},
+  {"date":"2026-02-14","type":"13F-HR","company":"All US Holdings","ticker":"Multiple","stake":"","details":"Q4 2025 quarterly holdings report — 9 holdings, $53.6B; added to MCO and SPGI","source":"SEC EDGAR","url":"https://www.sec.gov/Archives/edgar/data/1647251/000164725126000002/xslForm13F_X02/Form13fInfoTable.xml"}
+];
+
+const TCI_REPORTED = {
+  2022: { ret: -18.0, url: "https://www.bloomberg.com/news/articles/2024-01-05/chris-hohn-s-hedge-fund-bounces-back-with-33-gain-in-2023" },
+  2023: { ret: 32.7, url: "https://www.bloomberg.com/news/articles/2024-01-05/chris-hohn-s-hedge-fund-bounces-back-with-33-gain-in-2023" },
+  2024: { ret: 15.0, url: "https://www.institutionalinvestor.com/article/2ecrz2s6w3g2k4h9soo3k/hedge-funds/how-chris-hohns-concentrated-portfolio-fared-last-year" },
+  2025: { ret: 27.8, url: "https://www.disruptionbanking.com/2026/01/24/how-much-returns-did-tci-fund-management-make-in-2025/" }
+};
+
+const HOLDINGS_PERIODS = ["Dec-21","Mar-22","Jun-22","Sep-22","Dec-22","Mar-23","Jun-23","Sep-23","Dec-23*","Mar-24","Jun-24","Sep-24","Dec-24","Mar-25","Jun-25","Sep-25","Dec-25","27-Feb-26","12-Mar-26"];
+
+const HOLDINGS = {"Alphabet":{"region":"US","values":{"Dec-21":10300,"Mar-22":8200,"Jun-22":7100,"Sep-22":6500,"Dec-22":6200,"Mar-23":2400,"Jun-23":2200,"Sep-23":2200,"Dec-23*":2700,"Mar-24":2783,"Jun-24":4200,"Sep-24":3800,"Dec-24":4130,"Mar-25":2832,"Jun-25":2856,"Sep-25":1900,"Dec-25":2400,"27-Feb-26":2400,"12-Mar-26":2400}},"MSFT":{"region":"US","values":{"Dec-21":5600,"Mar-22":5300,"Jun-22":5000,"Sep-22":4600,"Dec-22":5300,"Mar-23":4400,"Jun-23":4000,"Mar-24":4400,"Jun-24":4700,"Sep-24":5200,"Dec-24":5900,"Mar-25":6500,"Jun-25":8700,"Sep-25":8600,"Dec-25":8100,"27-Feb-26":8100,"12-Mar-26":8100}},"Visa":{"region":"US","values":{"Dec-21":5000,"Mar-22":4400,"Jun-22":3900,"Sep-22":3500,"Dec-22":4100,"Mar-23":4300,"Jun-23":4200,"Sep-23":3900,"Dec-23*":4430,"Mar-24":4700,"Jun-24":4400,"Sep-24":4600,"Dec-24":5300,"Mar-25":5800,"Jun-25":6800,"Sep-25":9600,"Dec-25":9700,"27-Feb-26":9700,"12-Mar-26":9700}},"CN Railway":{"region":"US","values":{"Dec-21":4500,"Mar-22":4900,"Jun-22":4100,"Sep-22":4000,"Dec-22":4400,"Mar-23":4300,"Jun-23":5000,"Sep-23":4400,"Dec-23*":5100,"Mar-24":5200,"Jun-24":4700,"Sep-24":4200,"Dec-24":3000,"Mar-25":2600,"Jun-25":2400,"Sep-25":1800,"Dec-25":974,"27-Feb-26":974,"12-Mar-26":974}},"CP Kansas City":{"region":"US","values":{"Dec-21":4000,"Mar-22":4600,"Jun-22":3900,"Sep-22":3700,"Dec-22":4200,"Mar-23":4300,"Jun-23":4500,"Sep-23":4200,"Dec-23*":4490,"Mar-24":4800,"Jun-24":4300,"Sep-24":4700,"Dec-24":4000,"Mar-25":3900,"Jun-25":4200,"Sep-25":3700,"Dec-25":3500,"27-Feb-26":3500,"12-Mar-26":3500}},"Moody's":{"region":"US","values":{"Dec-21":2600,"Mar-22":2500,"Jun-22":2200,"Sep-22":2000,"Dec-22":2600,"Mar-23":3200,"Jun-23":3700,"Sep-23":3300,"Dec-23*":3890,"Mar-24":4800,"Jun-24":5600,"Sep-24":6300,"Dec-24":6300,"Mar-25":6100,"Jun-25":6600,"Sep-25":6300,"Dec-25":6800,"27-Feb-26":6800,"12-Mar-26":6800}},"S&P Global":{"region":"US","values":{"Dec-21":1800,"Mar-22":2800,"Jun-22":3000,"Sep-22":2700,"Dec-22":3100,"Mar-23":3200,"Jun-23":3700,"Sep-23":3300,"Dec-23*":4010,"Mar-24":3800,"Jun-24":4600,"Sep-24":5400,"Dec-24":5200,"Mar-25":5300,"Jun-25":5800,"Sep-25":5400,"Dec-25":6200,"27-Feb-26":6200,"12-Mar-26":6200}},"Charter":{"region":"US","values":{"Dec-21":6400,"Mar-22":1200}},"Union Pacific":{"region":"US","values":{"Dec-21":1500,"Mar-22":1400,"Jun-22":1100,"Sep-22":1100,"Dec-22":1}},"BXP":{"region":"US","values":{"Dec-21":1400,"Mar-22":1500,"Jun-22":940,"Sep-22":391}},"GE Aerospace":{"region":"US","values":{"Mar-23":2500,"Jun-23":4600,"Sep-23":4600,"Dec-23*":5370,"Mar-24":8200,"Jun-24":7700,"Sep-24":9100,"Dec-24":7700,"Mar-25":9500,"Jun-25":12000,"Sep-25":14000,"Dec-25":15000,"27-Feb-26":15000,"12-Mar-26":15000}},"Thermo Fisher":{"region":"US","values":{"Dec-22":35,"Mar-23":481,"Jun-23":1700,"Sep-23":1600,"Dec-23*":1700,"Mar-24":882}},"Ferrovial":{"region":"US","values":{"Jun-24":742,"Sep-24":820,"Dec-24":813,"Mar-25":861,"Jun-25":1000,"Sep-25":1100,"Dec-25":1300,"27-Feb-26":1300,"12-Mar-26":1300}},"Safran":{"region":"EU","values":{"Dec-21":1911,"Mar-22":1773,"Jun-22":1675,"Sep-22":2037,"Dec-22":2654,"Mar-23":3181,"Jun-23":3684,"Sep-23":3706,"Dec-23*":4130,"Mar-24":5252,"Jun-24":5204,"Sep-24":5683,"Dec-24":5375,"Mar-25":6470,"Jun-25":8302,"Sep-25":9181,"Dec-25":9293,"27-Feb-26":11021,"12-Mar-26":11184}},"Airbus":{"region":"EU","values":{"Dec-21":3049,"Mar-22":2890,"Jun-22":2399,"Sep-22":2246,"Dec-22":2838,"Mar-23":3354,"Jun-23":3495,"Sep-23":3288,"Dec-23*":3832,"Mar-24":4277,"Jun-24":3459,"Sep-24":3584,"Dec-24":3804,"Mar-25":4231,"Jun-25":4641,"Sep-25":4922,"Dec-25":5004,"27-Feb-26":4716,"12-Mar-26":4838}},"AENA":{"region":"EU","values":{"Dec-21":1565,"Mar-22":1563,"Jun-22":1234,"Sep-22":1016,"Dec-22":1351,"Mar-23":1493,"Jun-23":1649,"Sep-23":1616,"Dec-23*":1808,"Mar-24":1848,"Jun-24":1767,"Sep-24":2033,"Dec-24":1901,"Mar-25":2113,"Jun-25":2393,"Sep-25":2490,"Dec-25":2570,"27-Feb-26":2784,"12-Mar-26":2728}},"Cellnex":{"region":"EU","values":{"Dec-21":3659,"Mar-22":3120,"Jun-22":2563,"Sep-22":1966,"Dec-22":2312,"Mar-23":2516,"Jun-23":2473,"Sep-23":2311,"Dec-23*":2522,"Mar-24":2277,"Jun-24":2340,"Sep-24":2488,"Dec-24":2191,"Mar-25":2323,"Jun-25":2510,"Sep-25":2102,"Dec-25":1834,"27-Feb-26":2141,"12-Mar-26":2177}}};
+
+// ===== SHARED HELPERS =====
+const dailyReturns = DAILY.map((m, i) => {
+  if (i === 0) return { date: m.date, known: 0, actual: 0, sp500: 0 };
+  const p = DAILY[i-1];
+  return { date: m.date, known: p.known ? (m.known/p.known - 1) : 0, actual: p.actual ? (m.actual/p.actual - 1) : 0, sp500: p.sp500 ? (m.sp500/p.sp500 - 1) : 0 };
+});
+
+let currentRange = 'max';
+let currentView = 'cumulative';
+let chart = null;
+let holdingsChart = null;
+
+const series = {
+  known:  { label: 'TCI Shadow (Known)', color: '#3b82f6', visible: true, dash: false },
+  sp500:  { label: 'S\u0026P 500 TR',    color: '#9ca3af', visible: true, dash: false }
+};
+
+// ===== TAB SWITCHING =====
+document.querySelectorAll('.top-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.top-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'returns' && chart) chart.resize();
+    if (tab.dataset.tab === 'holdings' && holdingsChart) holdingsChart.resize();
+  });
+});
+
+// ===== TAB 1: RETURNS =====
+function updateHero(filtered) {
+  const el = document.getElementById('heroReturn');
+  const f = filtered[0], l = filtered[filtered.length - 1];
+  const retPct = ((l.known / f.known) - 1) * 100;
+  const retAbs = l.known - f.known;
+  const isPos = retPct >= 0;
+  const arrow = isPos ? '\u2191' : '\u2193';
+  const pillCls = isPos ? 'pill-green' : 'pill-red';
+  const clr = isPos ? 'green' : 'red';
+  const fmtDate = d => { const dt = new Date(d); return dt.toLocaleDateString('en-US', {day:'numeric',month:'short',year:'numeric'}); };
+  el.innerHTML = `
+    <div class="big-num ${clr}">$${l.known.toFixed(2)}</div>
+    <div class="change-line">
+      <span class="change-pill ${pillCls}">${arrow}${Math.abs(retPct).toFixed(2)}%</span>
+      <span class="${clr}">${isPos?'+':''}${retAbs.toFixed(3)}</span>
+      <span class="date-label">${fmtDate(f.date)} – ${fmtDate(l.date)}</span>
+    </div>`;
+}
+
+function updateStats(filtered) {
+  const f = filtered[0], l = filtered[filtered.length - 1];
+  const retK = ((l.known/f.known)-1)*100;
+  const retS = ((l.sp500/f.sp500)-1)*100;
+  const alpha = retK - retS;
+  const yrs = (new Date(l.date)-new Date(f.date))/(365.25*86400000);
+  const annK = yrs > 0.5 ? (Math.pow(l.known/f.known,1/yrs)-1)*100 : null;
+  const annS = yrs > 0.5 ? (Math.pow(l.sp500/f.sp500,1/yrs)-1)*100 : null;
+  const annStr = annK !== null ? `${annK.toFixed(1)}% ann.` : '';
+  const annSStr = annS !== null ? `${annS.toFixed(1)}% ann.` : '';
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card"><div class="label">Shadow Return</div><div class="value ${retK>=0?'green':'red'}">${retK>=0?'+':''}${retK.toFixed(1)}%</div><div class="sub">${annStr}</div></div>
+    <div class="stat-card"><div class="label">S&P 500 TR</div><div class="value ${retS>=0?'green':'red'}">${retS>=0?'+':''}${retS.toFixed(1)}%</div><div class="sub">${annSStr}</div></div>
+    <div class="stat-card"><div class="label">Alpha vs S&P</div><div class="value ${alpha>=0?'green':'red'}">${alpha>=0?'+':''}${alpha.toFixed(1)}pp</div></div>
+    <div class="stat-card"><div class="label">Growth of $1</div><div class="value blue">$${l.known.toFixed(2)}</div><div class="sub">vs $${l.sp500.toFixed(2)} S&P</div></div>`;
+}
+
+function filterByRange(range) {
+  const last = DAILY[DAILY.length - 1];
+  const endDate = new Date(last.date);
+  let startDate;
+  switch (range) {
+    case '3m':  startDate = new Date(endDate); startDate.setMonth(startDate.getMonth() - 3); break;
+    case '6m':  startDate = new Date(endDate); startDate.setMonth(startDate.getMonth() - 6); break;
+    case 'ytd': startDate = new Date(endDate.getFullYear(), 0, 1); break;
+    case '1y':  startDate = new Date(endDate); startDate.setFullYear(startDate.getFullYear() - 1); break;
+    case '2y':  startDate = new Date(endDate); startDate.setFullYear(startDate.getFullYear() - 2); break;
+    default:    startDate = new Date('2021-12-01');
+  }
+  return DAILY.filter(m => new Date(m.date) >= startDate);
+}
+
+function filterReturnsByRange(range) {
+  const last = DAILY[DAILY.length - 1];
+  const endDate = new Date(last.date);
+  let startDate;
+  switch (range) {
+    case '3m':  startDate = new Date(endDate); startDate.setMonth(startDate.getMonth() - 3); break;
+    case '6m':  startDate = new Date(endDate); startDate.setMonth(startDate.getMonth() - 6); break;
+    case 'ytd': startDate = new Date(endDate.getFullYear(), 0, 1); break;
+    case '1y':  startDate = new Date(endDate); startDate.setFullYear(startDate.getFullYear() - 1); break;
+    case '2y':  startDate = new Date(endDate); startDate.setFullYear(startDate.getFullYear() - 2); break;
+    default:    startDate = new Date('2021-12-01');
+  }
+  return dailyReturns.filter(m => new Date(m.date) >= startDate);
+}
+
+function scrollToEvent(date) {
+  const rows = document.querySelectorAll('#eventsTable tbody tr[data-date="' + date + '"]');
+  document.querySelectorAll('#eventsTable tbody tr.highlight').forEach(r => r.classList.remove('highlight'));
+  if (rows.length > 0) {
+    rows.forEach(r => r.classList.add('highlight'));
+    rows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => rows.forEach(r => r.classList.remove('highlight')), 3000);
+  }
+}
+
+function buildAnnotations(filtered) {
+  const startDate = new Date(filtered[0].date + 'T00:00:00');
+  const endDate = new Date(filtered[filtered.length - 1].date + 'T23:59:59');
+  const ann = {};
+  PORTFOLIO_CHANGES.forEach((pc, i) => {
+    const pd = new Date(pc.date + 'T12:00:00');
+    if (pd < startDate || pd > endDate) return;
+    const clr = pc.type === '13F-HR' ? 'rgba(37,99,235,0.22)'
+      : pc.type.includes('13D') || pc.type === 'Proxy Fight' ? 'rgba(220,38,38,0.22)'
+      : pc.type === 'Substantial Holding' || pc.type === 'Derivative Notification' ? 'rgba(22,163,74,0.28)'
+      : pc.type === 'Activist Letter' || pc.type === 'Board Appointment' ? 'rgba(147,51,234,0.22)'
+      : pc.type === 'Shareholder Proposal' || pc.type === 'TCFD Report' ? 'rgba(234,179,8,0.25)'
+      : 'rgba(107,114,128,0.2)';
+    let closest = filtered[0].date, minD = Infinity;
+    filtered.forEach(m => { const diff = Math.abs(new Date(m.date + 'T12:00:00') - pd); if (diff < minD) { minD = diff; closest = m.date; } });
+    ann['ev' + i] = {
+      type: 'line', xMin: closest, xMax: closest,
+      borderColor: clr, borderWidth: 1.5, borderDash: [5, 4],
+      label: {
+        display: false,
+        content: pc.type + ': ' + (pc.company||'').substring(0, 20),
+        position: 'start', backgroundColor: 'rgba(0,0,0,0.85)', color: '#fff',
+        font: { size: 10, weight: '500' }, padding: { top: 4, bottom: 4, left: 8, right: 8 }, cornerRadius: 4
+      },
+      enter(ctx) { ctx.element.options.label.display = true; ctx.chart.canvas.style.cursor = 'pointer'; ctx.chart.draw(); },
+      leave(ctx) { ctx.element.options.label.display = false; ctx.chart.canvas.style.cursor = 'default'; ctx.chart.draw(); },
+      click() { scrollToEvent(pc.date); }
+    };
+  });
+  return ann;
+}
+
+function renderLegend() {
+  const el = document.getElementById('legend');
+  el.innerHTML = '';
+  Object.entries(series).forEach(([key, s]) => {
+    const div = document.createElement('div');
+    div.className = 'legend-item' + (s.visible ? '' : ' muted');
+    const dashCls = s.dash ? ' dashed' : '';
+    div.innerHTML = `<span class="swatch${dashCls}" style="--c:${s.color}"></span>${s.label}`;
+    div.onclick = () => { s.visible = !s.visible; buildChart(); };
+    el.appendChild(div);
+  });
+}
+
+function buildChart() {
+  renderLegend();
+  const isCum = currentView === 'cumulative';
+  const filtered = isCum ? filterByRange(currentRange) : filterReturnsByRange(currentRange);
+  let src;
+  if (isCum) {
+    const base = filtered[0];
+    src = filtered.map(m => ({ date: m.date, known: m.known / base.known, sp500: m.sp500 / base.sp500 }));
+  } else { src = filtered; }
+
+  updateHero(isCum ? src : filterByRange(currentRange).map((m,i,arr) => ({ ...m, known: m.known/arr[0].known, sp500: m.sp500/arr[0].sp500 })));
+  updateStats(isCum ? src : filterByRange(currentRange).map((m,i,arr) => ({ ...m, known: m.known/arr[0].known, sp500: m.sp500/arr[0].sp500 })));
+
+  const labels = src.map(m => m.date);
+  const datasets = [];
+  if (series.known.visible) datasets.push({ label: series.known.label, data: src.map(m => isCum ? m.known : m.known * 100), borderColor: series.known.color, backgroundColor: 'rgba(59,130,246,0.05)', fill: isCum, borderWidth: 2.5, pointRadius: 2, pointHoverRadius: 5, pointHoverBackgroundColor: series.known.color, tension: 0.25 });
+  if (series.sp500.visible) datasets.push({ label: series.sp500.label, data: src.map(m => isCum ? m.sp500 : m.sp500 * 100), borderColor: series.sp500.color, backgroundColor: 'transparent', fill: false, borderWidth: 1.5, pointRadius: 2, pointHoverRadius: 5, pointHoverBackgroundColor: series.sp500.color, tension: 0.25 });
+
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById('mainChart'), {
+    type: 'line', data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(255,255,255,0.97)', titleColor: '#111', bodyColor: '#333',
+          titleFont: { size: 13, weight: '600' }, bodyFont: { size: 12 },
+          padding: 14, cornerRadius: 8, borderColor: '#d1d5db', borderWidth: 1,
+          boxWidth: 16, boxHeight: 2,
+          callbacks: {
+            title(items) { const d = new Date(items[0].label + 'T12:00:00'); return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }); },
+            label(ctx) { const v = ctx.parsed.y; return isCum ? ` ${ctx.dataset.label}: $${v.toFixed(3)}` : ` ${ctx.dataset.label}: ${v >= 0 ? '+' : ''}${v.toFixed(2)}%`; },
+            labelColor(ctx) { const ds = ctx.dataset; return { borderColor: ds.borderColor, backgroundColor: ds.borderColor, borderWidth: ds.borderWidth || 2, borderDash: ds.borderDash || [] }; }
+          }
+        },
+        annotation: { annotations: buildAnnotations(src) }
+      },
+      scales: {
+        x: {
+          type: 'category', grid: { color: 'rgba(0,0,0,0.05)', drawTicks: false },
+          ticks: {
+            color: '#888', font: { size: 11 }, maxRotation: 0, padding: 8, autoSkip: false,
+            callback(val, i) {
+              const d = labels[i]; if (!d) return '';
+              const parts = d.split('-'); const yr = parseInt(parts[0]); const mo = parseInt(parts[1]);
+              const total = labels.length;
+              const mN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+              // Monthly data: show every quarter for long ranges, every month for short
+              if (total > 30) { if (mo === 1) return 'Jan ' + yr; if (mo === 7) return 'Jul'; return ''; }
+              if (total > 12) { if (mo % 3 === 1) return mN[mo-1] + ' ' + String(yr).slice(-2); return ''; }
+              return mN[mo-1] + ' ' + String(yr).slice(-2);
+            }
+          }
+        },
+        y: { grid: { color: 'rgba(0,0,0,0.05)', drawTicks: false }, ticks: { color: '#888', font: { size: 11 }, padding: 10, callback: v => isCum ? '$' + v.toFixed(2) : v.toFixed(1) + '%' } }
+      },
+      layout: { padding: { top: 10, right: 10, bottom: 4, left: 4 } }
+    }
+  });
+}
+
+// Range & view handlers
+document.querySelectorAll('.range-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); currentRange = btn.dataset.range; buildChart();
+  });
+});
+document.querySelectorAll('.view-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); currentView = btn.dataset.view; buildChart();
+  });
+});
+
+// Events table
+const tbody = document.querySelector('#eventsTable tbody');
+const sortedEvents = [...PORTFOLIO_CHANGES].sort((a, b) => new Date(b.date) - new Date(a.date));
+sortedEvents.forEach(pc => {
+  const badgeClass = pc.type === '13F-HR' ? 'badge-13f' : (pc.type.includes('13D') || pc.type === 'Proxy Fight') ? 'badge-13d' : (pc.type === 'Substantial Holding' || pc.type === 'Derivative Notification') ? 'badge-eu' : (pc.type === 'Activist Letter' || pc.type === 'Board Appointment') ? 'badge-activist' : (pc.type === 'Shareholder Proposal' || pc.type === 'TCFD Report') ? 'badge-proposal' : 'badge-other';
+  const tr = document.createElement('tr');
+  tr.setAttribute('data-date', pc.date);
+  if (pc.url) { tr.onclick = (e) => { if (e.target.tagName !== 'A') window.open(pc.url, '_blank'); }; }
+  const sourceLink = pc.url ? `<a class="source-link" href="${pc.url}" target="_blank" rel="noopener">${pc.source || 'View'} ↗</a>` : (pc.source || '');
+  tr.innerHTML = `
+    <td style="white-space:nowrap;font-variant-numeric:tabular-nums">${pc.date}</td>
+    <td><span class="badge ${badgeClass}">${pc.type}</span></td>
+    <td>${pc.company || ''}</td>
+    <td style="color:#999;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pc.details || ''}</td>
+    <td>${sourceLink}</td>`;
+  tbody.appendChild(tr);
+});
+
+// ===== TAB 2: ANNUAL COMPARISON =====
+function buildYearlyCards() {
+  const grid = document.getElementById('yearlyGrid');
+  const years = [2022, 2023, 2024, 2025];
+  grid.innerHTML = '';
+  years.forEach(yr => {
+    // Find last trading day in Dec of each year
+    const prevDec = DAILY.filter(m => m.date.startsWith((yr-1) + '-12'));
+    const yrDec = DAILY.filter(m => m.date.startsWith(yr + '-12'));
+    const prevEnd = prevDec.length ? prevDec[prevDec.length - 1] : null;
+    const yrEnd = yrDec.length ? yrDec[yrDec.length - 1] : null;
+    if (!prevEnd || !yrEnd) return;
+    const shadowRet = ((yrEnd.known / prevEnd.known) - 1) * 100;
+    const sp500Ret = ((yrEnd.sp500 / prevEnd.sp500) - 1) * 100;
+    const rep = TCI_REPORTED[yr];
+    const alpha = shadowRet - sp500Ret;
+    const fmt = (v) => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+    const clr = (v) => v >= 0 ? 'green' : 'red';
+
+    const card = document.createElement('div');
+    card.className = 'year-card';
+    card.innerHTML = `
+      <div class="year-title">${yr}</div>
+      <div class="yr-row"><span class="yr-label" style="font-weight:700;color:#111">TCI Shadow</span><span class="yr-val ${clr(shadowRet)}" style="font-weight:700">${fmt(shadowRet)}</span></div>
+      <div class="yr-divider"></div>
+      <div class="yr-row"><span class="yr-label">TCI Reported <span class="yr-badge">NET</span></span><span class="yr-val ${clr(rep.ret)}"><a class="yr-link" href="${rep.url}" target="_blank" rel="noopener">${fmt(rep.ret)} ↗</a></span></div>
+      <div class="yr-row" style="padding-left:12px"><span class="yr-label" style="font-size:11px;color:#aaa">vs TCI Shadow</span><span class="yr-val" style="font-size:12px;color:${(rep.ret - shadowRet) >= 0 ? '#16a34a' : '#dc2626'}">${(rep.ret - shadowRet) >= 0 ? '+' : ''}${(rep.ret - shadowRet).toFixed(1)}pp</span></div>
+      <div class="yr-divider"></div>
+      <div class="yr-row"><span class="yr-label">S&P 500 TR</span><span class="yr-val ${clr(sp500Ret)}">${fmt(sp500Ret)}</span></div>
+      <div class="yr-row" style="padding-left:12px"><span class="yr-label" style="font-size:11px;color:#aaa">vs TCI Shadow</span><span class="yr-val" style="font-size:12px;color:${(sp500Ret - shadowRet) >= 0 ? '#16a34a' : '#dc2626'}">${(sp500Ret - shadowRet) >= 0 ? '+' : ''}${(sp500Ret - shadowRet).toFixed(1)}pp</span></div>`;
+    grid.appendChild(card);
+  });
+}
+buildYearlyCards();
+
+// ===== TAB 3: HOLDINGS =====
+
+// Map each PORTFOLIO_CHANGES index → holdings period
+const EVENT_TO_PERIOD = [
+  'Dec-21',  // 0  2022-01-25 SC 13D/A CNI
+  'Dec-21',  // 1  2022-02-14 13F Q4 2021
+  'Dec-21',  // 2  2022-03-01 Shareholder Proposals
+  'Mar-22',  // 3  2022-03-22 Proxy Fight CNR
+  'Mar-22',  // 4  2022-04-01 Shareholder Proposals
+  'Mar-22',  // 5  2022-05-16 13F Q1 2022
+  'Jun-22',  // 6  2022-08-15 13F Q2 2022
+  'Sep-22',  // 7  2022-11-14 13F Q3 2022
+  'Sep-22',  // 8  2022-11-15 Activist Letter GOOG
+  'Dec-22',  // 9  2023-01-20 Activist Letter GOOG
+  'Dec-22',  // 10 2023-02-14 13F Q4 2022
+  'Dec-22',  // 11 2023-02-20 Activist Letter Airbus
+  'Dec-22',  // 12 2023-03-23 Activist Letter Cellnex
+  'Dec-22',  // 13 2023-03-23 Substantial Holding Cellnex
+  'Mar-23',  // 14 2023-05-15 13F Q1 2023
+  'Mar-23',  // 15 2023-05-17 Substantial Holding Ferrovial
+  'Jun-23',  // 16 2023-06-01 Board Appointment Cellnex
+  'Jun-23',  // 17 2023-06-01 Derivative AENA
+  'Jun-23',  // 18 2023-08-14 13F Q2 2023
+  'Sep-23',  // 19 2023-11-14 13F Q3 2023
+  'Dec-23*', // 20 2024-02-14 13F Q4 2023
+  'Dec-23*', // 21 2024-03-01 Shareholder Proposals
+  'Mar-24',  // 22 2024-05-15 13F Q1 2024
+  'Mar-24',  // 23 2024-06-01 Activist AENA
+  'Jun-24',  // 24 2024-08-14 13F Q2 2024
+  'Sep-24',  // 25 2024-11-01 SC 13D/A CNI
+  'Sep-24',  // 26 2024-11-14 13F Q3 2024
+  'Dec-24',  // 27 2025-02-14 13F Q4 2024
+  'Dec-24',  // 28 2025-03-01 Shareholder Proposals
+  'Mar-25',  // 29 2025-04-30 SC 13D/A CNI
+  'Mar-25',  // 30 2025-05-15 13F Q1 2025
+  'Jun-25',  // 31 2025-06-01 TCFD Report
+  'Jun-25',  // 32 2025-08-14 13F Q2 2025
+  'Sep-25',  // 33 2025-11-14 13F Q3 2025
+  'Dec-25'   // 34 2026-02-14 13F Q4 2025
+];
+
+function getEventsByPeriod() {
+  const map = {};
+  PORTFOLIO_CHANGES.forEach((ev, idx) => {
+    const p = EVENT_TO_PERIOD[idx];
+    if (!p) return;
+    if (!map[p]) map[p] = [];
+    map[p].push(idx);
+  });
+  return map;
+}
+
+function periodQuarterLabel(period) {
+  const clean = period.replace('*', '');
+  const parts = clean.split('-');
+  let mo, yr;
+  if (parts.length === 3) { mo = parts[1]; yr = '20' + parts[2]; }
+  else { mo = parts[0]; yr = '20' + parts[1]; }
+  const qMap = { 'Dec': 'Q4', 'Mar': 'Q1', 'Jun': 'Q2', 'Sep': 'Q3', 'Feb': 'Late Q4' };
+  return (qMap[mo] || mo) + ' ' + yr;
+}
+
+function buildHoldingsTab() {
+  const select = document.getElementById('holdingsPeriodSelect');
+  const eventsByPeriod = getEventsByPeriod();
+
+  // Only show periods that have associated events, most recent first
+  const periodsWithEvents = HOLDINGS_PERIODS.filter(p => eventsByPeriod[p]);
+  const reversed = [...periodsWithEvents].reverse();
+
+  reversed.forEach(p => {
+    const evIdxs = eventsByPeriod[p];
+    const primary13F = evIdxs.find(i => PORTFOLIO_CHANGES[i].type === '13F-HR');
+    const primaryEv = primary13F !== undefined ? PORTFOLIO_CHANGES[primary13F] : PORTFOLIO_CHANGES[evIdxs[0]];
+    const otherCount = evIdxs.length - 1;
+
+    let label = periodQuarterLabel(p) + '  ·  ' + primaryEv.type + ' (' + primaryEv.date + ')';
+    if (otherCount > 0) label += '  +' + otherCount + ' event' + (otherCount > 1 ? 's' : '');
+
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = label;
+    select.appendChild(opt);
+  });
+
+  select.addEventListener('change', () => renderHoldings(select.value));
+  renderHoldings(select.value);
+}
+
+function renderHoldings(period) {
+  const tbl = document.querySelector('#holdingsTable tbody');
+  tbl.innerHTML = '';
+  const periodIdx = HOLDINGS_PERIODS.indexOf(period);
+  const prevPeriod = periodIdx > 0 ? HOLDINGS_PERIODS[periodIdx - 1] : null;
+  const eventsByPeriod = getEventsByPeriod();
+  const eventIdxs = eventsByPeriod[period] || [];
+  const summaryEl = document.getElementById('holdingsEventsSummary');
+
+  // Build event cards
+  let evHTML = '<div class="holdings-events-list">';
+  eventIdxs.forEach(idx => {
+    const ev = PORTFOLIO_CHANGES[idx];
+    const bc = ev.type === '13F-HR' ? 'badge-13f' : (ev.type.includes('13D') || ev.type === 'Proxy Fight') ? 'badge-13d' : (ev.type === 'Substantial Holding' || ev.type === 'Derivative Notification') ? 'badge-eu' : (ev.type === 'Activist Letter' || ev.type === 'Board Appointment') ? 'badge-activist' : (ev.type === 'Shareholder Proposal' || ev.type === 'TCFD Report') ? 'badge-proposal' : 'badge-other';
+    const onclick = ev.url ? `onclick="window.open('${ev.url}','_blank')"` : '';
+    evHTML += `<div class="holdings-event-card" ${onclick}>
+      <span class="ev-date">${ev.date}</span>
+      <span class="badge ${bc}">${ev.type}</span>
+      <span class="ev-company">${ev.company || ''}</span>
+      <span class="ev-detail">${ev.details || ''}</span>
+    </div>`;
+  });
+  evHTML += '</div>';
+
+  // Gather current & previous holdings, compute changes
+  const rows = [];
+  let total = 0;
+  const changes = { new: [], exited: [], increased: [], decreased: [], unchanged: [] };
+
+  Object.entries(HOLDINGS).forEach(([name, h]) => {
+    const val = h.values[period] || 0;
+    const prev = prevPeriod ? (h.values[prevPeriod] || 0) : 0;
+
+    if (val > 0) {
+      const chgPct = prev > 0 ? ((val / prev) - 1) * 100 : null;
+      const chgDollar = val - prev;
+      let status;
+      if (prev === 0 || prev === undefined) status = 'new';
+      else if (chgPct > 5) status = 'increased';
+      else if (chgPct < -5) status = 'decreased';
+      else status = 'unchanged';
+      rows.push({ name, region: h.region, val, prev, chgPct, chgDollar, status });
+      total += val;
+      if (status !== 'unchanged') changes[status].push(name);
+    } else if (prev > 0 && val <= 0) {
+      rows.push({ name, region: h.region, val: 0, prev, chgPct: -100, chgDollar: -prev, status: 'exited' });
+      changes.exited.push(name);
+    }
+  });
+
+  // Sort: active by value desc, then exited at bottom
+  rows.sort((a, b) => {
+    if (a.status === 'exited' && b.status !== 'exited') return 1;
+    if (b.status === 'exited' && a.status !== 'exited') return -1;
+    return b.val - a.val;
+  });
+
+  // Change summary chips
+  let chipsHTML = '<div class="holdings-change-summary">';
+  if (!prevPeriod) {
+    chipsHTML += '<span class="change-chip change-chip-init">Initial portfolio snapshot</span>';
+  } else {
+    if (changes.new.length) chipsHTML += `<span class="change-chip change-chip-new">● ${changes.new.length} New: ${changes.new.join(', ')}</span>`;
+    if (changes.exited.length) chipsHTML += `<span class="change-chip change-chip-exit">● ${changes.exited.length} Exited: ${changes.exited.join(', ')}</span>`;
+    if (changes.increased.length) chipsHTML += `<span class="change-chip change-chip-up">↑ ${changes.increased.length} Increased</span>`;
+    if (changes.decreased.length) chipsHTML += `<span class="change-chip change-chip-down">↓ ${changes.decreased.length} Decreased</span>`;
+    const totalChanges = changes.new.length + changes.exited.length + changes.increased.length + changes.decreased.length;
+    if (totalChanges === 0) chipsHTML += '<span class="change-chip change-chip-init">No material changes</span>';
+  }
+  chipsHTML += '</div>';
+  summaryEl.innerHTML = evHTML + chipsHTML;
+
+  // Build table rows
+  const colors = ['#3b82f6','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#6366f1','#14b8a6','#f97316','#84cc16','#a855f7','#e11d48','#0ea5e9','#22c55e','#eab308','#64748b'];
+
+  rows.forEach((r, i) => {
+    const pct = total > 0 ? (r.val / total * 100) : 0;
+    const tr = document.createElement('tr');
+
+    // Row class by status
+    if (r.status === 'new') tr.className = 'row-new';
+    else if (r.status === 'exited') tr.className = 'row-exited';
+    else if (r.status === 'increased') tr.className = 'row-increased';
+    else if (r.status === 'decreased') tr.className = 'row-decreased';
+
+    // Change cell content
+    let chgStr = '', chgClass = '';
+    if (r.status === 'new') {
+      chgStr = '<span class="chg-label chg-label-new">NEW</span>';
+      chgClass = 'green';
+    } else if (r.status === 'exited') {
+      chgStr = '<span class="chg-label chg-label-exit">EXITED</span> was $' + r.prev.toLocaleString() + 'M';
+      chgClass = 'red';
+    } else if (r.chgPct !== null) {
+      const arrow = r.chgPct >= 0 ? '↑' : '↓';
+      chgStr = `${arrow} ${r.chgPct >= 0 ? '+' : ''}${r.chgPct.toFixed(1)}% ($${r.chgDollar >= 0 ? '+' : ''}${r.chgDollar.toLocaleString()}M)`;
+      chgClass = r.chgPct >= 5 ? 'green' : r.chgPct < -5 ? 'red' : '';
+    }
+
+    const regionBadge = r.region === 'EU' ? '<span class="region-badge region-eu">EU</span>' : '<span class="region-badge region-us">US</span>';
+    const barColor = colors[i % colors.length];
+    const nameStyle = r.status === 'exited' ? 'text-decoration:line-through;color:#999' : '';
+
+    tr.innerHTML = `
+      <td><strong style="${nameStyle}">${r.name}</strong></td>
+      <td>${regionBadge}</td>
+      <td class="right" style="font-variant-numeric:tabular-nums">${r.status === 'exited' ? '—' : '$' + r.val.toLocaleString() + 'M'}</td>
+      <td class="right" style="font-variant-numeric:tabular-nums">${r.status === 'exited' ? '—' : pct.toFixed(1) + '%'}</td>
+      <td>${r.status === 'exited' ? '' : '<span class="pct-bar" style="width:' + (pct * 1.5) + 'px;background:' + barColor + '"></span>'}</td>
+      <td class="right ${chgClass}" style="font-variant-numeric:tabular-nums;font-size:12px">${chgStr}</td>`;
+    tbl.appendChild(tr);
+  });
+
+  // Total row (active only)
+  const activeTotal = rows.filter(r => r.status !== 'exited').reduce((s, r) => s + r.val, 0);
+  const prevTotal = prevPeriod ? Object.values(HOLDINGS).reduce((s, h) => s + (h.values[prevPeriod] || 0), 0) : 0;
+  const totalChg = prevTotal > 0 ? ((activeTotal / prevTotal - 1) * 100) : 0;
+  const totalChgStr = prevPeriod && prevTotal > 0 ? ` (${totalChg >= 0 ? '+' : ''}${totalChg.toFixed(1)}%)` : '';
+  const totalTr = document.createElement('tr');
+  totalTr.className = 'total-row';
+  totalTr.innerHTML = `<td>Total</td><td></td><td class="right">$${activeTotal.toLocaleString()}M</td><td class="right">100%</td><td></td><td class="right" style="font-size:12px">${totalChgStr}</td>`;
+  tbl.appendChild(totalTr);
+
+  // Doughnut chart (active holdings only)
+  const activeRows = rows.filter(r => r.status !== 'exited');
+  if (holdingsChart) holdingsChart.destroy();
+  holdingsChart = new Chart(document.getElementById('holdingsChart'), {
+    type: 'doughnut',
+    data: {
+      labels: activeRows.map(r => r.name),
+      datasets: [{ data: activeRows.map(r => r.val), backgroundColor: activeRows.map((_, i) => colors[i % colors.length]), borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 12 }, padding: 12, usePointStyle: true, pointStyle: 'circle' } },
+        tooltip: {
+          callbacks: {
+            label(ctx) { const v = ctx.parsed; const t = ctx.dataset.data.reduce((a,b)=>a+b,0); return ` ${ctx.label}: $${v.toLocaleString()}M (${(v/t*100).toFixed(1)}%)`; }
+          }
+        }
+      }
+    }
+  });
+}
+
+buildHoldingsTab();
+
+// ===== INIT =====
+buildChart();
+</script>
+</body>
+</html>
